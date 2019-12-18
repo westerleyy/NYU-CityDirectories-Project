@@ -6,9 +6,9 @@ Working with JSON in bash:
 
 ### Step 1: Crop [file level action]
 
-<pre>for page in *.jpeg; do python XXXX.py $page; done;</pre>
+<pre>crop_for_columns.py cropped-jpegs/</pre>
 
-### Step 2: Tesseract (from within directory containing downloaded jpegs) [file-level actions]
+### Step 2: Tesseract (from within directory containing downloaded cropped jpegs) [file-level actions]
 
 <pre>for page in *_cropped.jpeg; do tesseract $page ${page/.jpeg/} --psm 1 --oem 1 hocr; done;</pre>
 

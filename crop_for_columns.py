@@ -50,8 +50,56 @@ folder_name4 = "/1889.4b939190-317a-0134-d1d5-00505686a51c"
 folder_name5 = "/1904.4bc7db80-317a-0134-c859-00505686a51c"
 
 
-# The following chunk draws code from this [site](https://github.com/danvk/oldnyc/blob/master/ocr/tess/crop_morphology.py) with the following [methodology](http://www.danvk.org/2015/01/07/finding-blocks-of-text-in-an-image-using-python-opencv-and-numpy.html) to automate the bounding box creation process. 
-# I made some modifications to cut out everything but the text. The original code always detected the edge of pages behind the current page as an edge, thus throwing the entire cropping process off-kilter. It works now. Tested on two pages in the test directory.
+#The following chunk draws code from this [site](https://github.com/danvk/oldnyc/blob/master/ocr/tess/crop_morphology.py) with the following [methodology](http://www.danvk.org/2015/01/07/finding-blocks-of-text-in-an-image-using-python-opencv-and-numpy.html) to automate the bounding box creation process. 
+#I made some modifications to cut out everything but the text. The original code always detected the edge of pages behind the current page as an edge, thus throwing the entire cropping process off-kilter. It works now. Tested on all pages in the test directory. 
+#It also incorporates code adapted from [here](https://gist.github.com/russss/922be97d2a65eb534744c5a4054ff88d) to straighten any skew introduced in the scanning process. The Probabilistic Hough Line Transform performed here would only detect the center dividing columns. If the original function written by @russss was used wholesale, it will assume that the image is a landscape image and proceed to rotate it 90 degrees; which we do not want! Hence, I took out that bit and the image is nicely deskewed. There is still some skew but I think it is pretty decent.   
+
+def deskew(im, save_directory, max_skew=10):
+    height, width = im.shape[:2]
+    print(height)
+    print(width)
+
+    # Create a grayscale image and denoise it
+    im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
+
+    # Create an inverted B&W copy using Otsu (automatic) thresholding
+    im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+
+    # Detect lines in this image. Parameters here mostly arrived at by trial and error.
+    lines = cv2.HoughLinesP(
+        im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
+    )
+
+    # Collect the angles of these lines (in radians)
+    angles = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        geom = np.arctan2(y2 - y1, x2 - x1)
+        print(np.rad2deg(geom))
+        angles.append(geom)
+
+    angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
+
+    if len(angles) < 5:
+        # Insufficient data to deskew
+        print("Insufficient data to deskew. Input image might already be straight. Check printout above.")
+        return im
+
+    # Average the angles to a degree offset
+    angle_deg = np.rad2deg(np.median(angles))
+
+    # Rotate the image by the residual offset
+    M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
+    im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+    
+    # Plot and save
+    plt.subplot(111),plt.imshow(im)
+    plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+    plt.show()
+    cv2.imwrite(img = im, 
+                filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+    return im
 
 def dilate(ary, N, iterations): 
     """Dilate using an NxN '+' sign shape. ary is np.uint8."""
@@ -328,22 +376,11 @@ def process_image(path, out_path):
     text_im.save(out_path + cropped_jpeg)
 #    print '%s -> %s' % (path, out_path)
 
-
-# if __name__ == '__main__':
-#     if len(sys.argv) == 2 and '*' in sys.argv[1]:
-#         files = glob.glob(sys.argv[1])
-#         random.shuffle(files)
-#     else:
-#         files = sys.argv[1:]
-
-#     for path in files:
-#         out_path = path.replace('.jpeg', '.crop.png')
-#         if os.path.exists(out_path): continue
-#         try:
-#             process_image(path, out_path)
-#         except Exception as e:
-#             print(" ")
-# #            print '%s %s' % (path, e)
+    # Deskew image 
+    cropped_image = cv2.imread(out_path + cropped_jpeg)
+    print("Cropped image read")
+    deskewed_image = deskew(im = cropped_image, 
+                            save_directory = out_path)
 
 
 # In[12]:

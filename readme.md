@@ -35,7 +35,9 @@ OCR Engine Modes:
   2    Legacy + LSTM engines. **(default)**  
   3    Default, based on what is available.  
     
-Of these four options, the default `-oem` option appears to be the best. 
+Of these four options, the default `-oem` option appears to be the best.  
+  
+In other words, Tesseract's `psm` and `oem` options might not be suitable in solving the issue of columns being skipped. The deskew and image rotation might have solved the problem by aligning the starting point of each line.   
 
 #### Current List of Hyperparameters
 

@@ -11,30 +11,31 @@ The `crop_for_columns.py` file operationalizes for bash command line operations.
 Page Segmentation Modes:  
   0    Orientation and script detection (OSD) only.  
   1    Automatic page segmentation with OSD.  
-  2    Automatic page segmentation, but no OSD, or OCR.
-  3    Fully automatic page segmentation, but no OSD. (Default)
-  4    Assume a single column of text of variable sizes.
-  5    Assume a single uniform block of vertically aligned text.
-  6    Assume a single uniform block of text.
-  7    Treat the image as a single text line.
-  8    Treat the image as a single word.
-  9    Treat the image as a single word in a circle.
- 10    Treat the image as a single character.
- 11    Sparse text. Find as much text as possible in no particular order.
- 12    Sparse text with OSD.
- 13    Raw line. Treat the image as a single text line, bypassing hacks that are Tesseract-specific.  
+  2    Automatic page segmentation, but no OSD, or OCR.  
+  3    Fully automatic page segmentation, but no OSD. **(Default)**  
+  4    Assume a single column of text of variable sizes.  
+  5    Assume a single uniform block of vertically aligned text.  
+  6    Assume a single uniform block of text.  
+  7    Treat the image as a single text line.  
+  8    Treat the image as a single word.  
+  9    Treat the image as a single word in a circle.  
+ 10    Treat the image as a single character.  
+ 11    Sparse text. Find as much text as possible in no particular order.  
+ 12    Sparse text with OSD.  
+ 13    Raw line. Treat the image as a single text line, bypassing hacks that are Tesseract-specific.    
    
-I am not sure if changing any of the Page Segmentation Nodes options will signficantly improve the performance of the Tesseract because most of the other options focus on numerical u. OSD will not be helpful because deskewing and rotation will already have taken place and the language of the directory is English. 
-
+Changing any of the Page Segmentation Nodes options will not signficantly improve the performance of the Tesseract except maybe `-psm` = 5.   
+Most of the options describe text formats that are unlike those in the directories. OSD will not be helpful because deskewing and rotation will already have taken place and the language of the directory is English. There might be non-English last names such as Núnez for example, but they are not significantly different from English to warrant changing the `psm` modes.  
+  
 `-oem` stands for OCR Engine Mode. Tesseract's own [readme](https://github.com/tesseract-ocr/tesseract/wiki/ReadMe) is not particularly helpful. This [page](https://www.learnopencv.com/deep-learning-based-text-recognition-ocr-using-tesseract-and-opencv/) provides more information on the OEM options available. 
 
-OCR Engine Modes:
-  0    Legacy engine only.
-  1    Neural nets LSTM engine only.
-  2    Legacy + LSTM engines. (default)
+OCR Engine Modes:  
+  0    Legacy engine only.  
+  1    Neural nets LSTM engine only.  
+  2    Legacy + LSTM engines. **(default)**  
   3    Default, based on what is available.  
-  
-Based on these four options. it appears that there is nothing that can be done on our end. 
+    
+Of these four options, the default `-oem` option appears to be the best. 
 
 #### Current List of Hyperparameters
 

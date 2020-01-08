@@ -24,7 +24,7 @@ Page Segmentation Modes:
  12    Sparse text with OSD.  
  13    Raw line. Treat the image as a single text line, bypassing hacks that are Tesseract-specific.    
    
-Changing any of the Page Segmentation Nodes options will not signficantly improve the performance of the Tesseract except maybe `-psm` = 5.   
+Changing any of the Page Segmentation Nodes options will not signficantly improve the performance of the Tesseract. It appear that `-psm` = 5 is designed with Asian languages such as Chinese, Japanese, and Korean in mind.   
 Most of the options describe text formats that are unlike those in the directories. OSD will not be helpful because deskewing and rotation will already have taken place and the language of the directory is English. There might be non-English last names such as Núnez for example, but they are not significantly different from English to warrant changing the `psm` modes.  
   
 `-oem` stands for OCR Engine Mode. Tesseract's own [readme](https://github.com/tesseract-ocr/tesseract/wiki/ReadMe) is not particularly helpful. This [page](https://www.learnopencv.com/deep-learning-based-text-recognition-ocr-using-tesseract-and-opencv/) provides more information on the OEM options available. 
@@ -39,11 +39,11 @@ Of these four options, the default `-oem` option appears to be the best.
 
 #### Current List of Hyperparameters
 
-1. Pre-crop processing?
+1. Pre-crop processing: Edge detection, dilation etc. 
 
-2. Post-crop contrast heightening
+2. Post-crop processing: Deskew and image rotation.
 
-3. Tesseract -oem and -psm values
+3. Tesseract `-oem` and `-psm` values: 2 and 3 respectively 
 
 4. hocr-detect columns?
 

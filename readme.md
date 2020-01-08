@@ -8,9 +8,9 @@ The `crop_for_columns.py` file operationalizes for bash command line operations.
 #### Tesseract -oem and -psm values  
 `-psm` stands for Page Segmentation Modes. This [page](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality#page-segmentation-method) explains in detail how it works but basically there are 14 options as listed below:  
 
-Page Segmentation Modes:
-  0    Orientation and script detection (OSD) only.
-  1    Automatic page segmentation with OSD.
+Page Segmentation Modes:  
+  0    Orientation and script detection (OSD) only.  
+  1    Automatic page segmentation with OSD.  
   2    Automatic page segmentation, but no OSD, or OCR.
   3    Fully automatic page segmentation, but no OSD. (Default)
   4    Assume a single column of text of variable sizes.

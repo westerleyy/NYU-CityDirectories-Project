@@ -4,26 +4,11 @@ import argparse
 
 def process_image(args):
     
-    import sys
-    import glob
     import os
-    import random
-    import math
-    import json
-    from collections import defaultdict
     from scipy.ndimage.filters import rank_filter
     import numpy as np
-    import pandas as pd
-    import pytesseract
     from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
-    from io import StringIO    
-    from skimage import io
-    from skimage import transform as tf
-    from skimage.feature import canny
     import matplotlib.pyplot as plt
-    from IPython.display import display
-    import spacy
-    import re
     import cv2
     
     path = args.input
@@ -68,12 +53,13 @@ def process_image(args):
         M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
         im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
 
-        # Plot and save
-        plt.subplot(111),plt.imshow(im)
-        plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
-        plt.show()
-        cv2.imwrite(img = im, 
-                    filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+        # Plot and save if a full run
+        if args.type == "full":
+            plt.subplot(111),plt.imshow(im)
+            plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+            plt.show()
+            cv2.imwrite(img = im,
+                        filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
         return im
 
     def dilate(ary, N, iterations): 
@@ -86,9 +72,10 @@ def process_image(args):
         kernel[:,(N-1)//2] = 1
         dilated_image = cv2.dilate(dilated_image, kernel, iterations=iterations)
 
-        plt.subplot(111),plt.imshow(dilated_image,cmap = 'gray')
-        plt.title('Dilated Image'), plt.xticks([]), plt.yticks([])
-        plt.show()
+        if args.type == "full":
+            plt.subplot(111),plt.imshow(dilated_image,cmap = 'gray')
+            plt.title('Dilated Image'), plt.xticks([]), plt.yticks([])
+            plt.show()
 
         return dilated_image
 
@@ -301,11 +288,12 @@ def process_image(args):
     
     # Detect edge and plot
     edges = cv2.Canny(img, 100, 400)
-    
-    plt.subplot(111),plt.imshow(edges,cmap = 'gray')
-    plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
 
-    plt.show()
+    if args.type == "full":
+        plt.subplot(111),plt.imshow(edges,cmap = 'gray')
+        plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
+
+        plt.show()
 
     # TODO: dilate image _before_ finding a border. This is crazy sensitive!
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -343,7 +331,8 @@ def process_image(args):
     im.save(out_path + cropped_jpeg)
     draw.text((50, 50), path, fill='red')
     orig_im.save(out_path + cropped_jpeg)
-    im.show()
+    if args.type == "full":
+        im.show()
     text_im = orig_im.crop(crop)
     text_im.save(out_path + cropped_jpeg)
 #    print '%s -> %s' % (path, out_path)
@@ -357,6 +346,7 @@ def process_image(args):
 
 def main():
     parser=argparse.ArgumentParser(description="Read a scanned street directory image, crop, and deskew.")
+    parser.add_argument("-type", help="Select a type of image process, full or minimal", dest="type", type=str, required=True)
     parser.add_argument("-in", help = "Input file directory", dest="input", type=str, required=True)
     parser.add_argument("-out",help="Output file directory" ,dest="output", type=str, required=True)
     parser.set_defaults(func=process_image)

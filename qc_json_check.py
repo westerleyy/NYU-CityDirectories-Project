@@ -3,7 +3,7 @@
 import argparse
 import json
 import os
-from fuzzywuzzy import fuzz
+import difflib
 
 def check_json(args):
     for file in os.listdir(args.input):
@@ -14,35 +14,43 @@ def check_json(args):
                 for rec in list_json:
                     entry_json = json.loads(rec)
                     try:
-                        if rec_json['locations'][0]['value'] != 'null':
+                        if entry_json['locations'][0]['value'] != 'null':
                             labeled_json_recs.append(entry_json)
                     except:
-                        labeled_json_recs.append(entry_json)
+                        if len(entry_json['locations']) != 0:
+                            labeled_json_recs.append(entry_json)
             f.close()
+            labeled_txt = ""
+            for entry in labeled_json_recs:
+                labeled_txt += ' '.join([i for i in entry['subjects']]) + ' '
+                labeled_txt += ' '.join([i for i in entry['occupations']]) + ' '
+                locations_list = sorted(entry['locations'], key=lambda x:x['value'])
+                for loc in locations_list:
+                    labeled_txt += loc['value'] + ' '
+                    try:
+                        labeled_txt += ' '.join([k for k in loc['labels']]) + ' '
+                    except:
+                        pass
+                labeled_txt = labeled_txt.rstrip() + '\n'
+            labeled_txt = labeled_txt.replace('\n\n', '\n')
             with open(args.test + file.replace('_cropped.hocr','_validate')) as f:
                 validate_json = json.loads(f.read())
-                print(len(validate_json))
             f.close()
-            curr_index = 0
-            for labeled_entry in labeled_json_recs:
-                # name/subject
-
-                name_score = fuzz.ratio(labeled_entry['subjects'], validate_json[curr_index]['name'])
-                print("Machine: ", labeled_entry['subjects'])
-                print("Human: ", validate_json[curr_index]['name'])
-                print(name_score)
-                # occupations
-
-                occ_score = fuzz.ratio(labeled_entry['subjects'], validate_json[curr_index]['name'])
-
-                #
-
-                # if name_score > 98:
-                #     print("Machine: ", labeled_entry['subjects'])
-                #     print("Human: ", validate_json[curr_index]['name'])
-                # else:
-                if curr_index < len(validate_json) - 1:
-                    curr_index+=1
+            validate_txt = ""
+            for val_entry in validate_json:
+                validate_txt += val_entry['name'] + ' '
+                validate_txt += ' '.join([i for i in val_entry['occupations']]) + ' '
+                locations_list = sorted(val_entry['locations'], key=lambda x:x['value'])
+                for loc in locations_list:
+                    validate_txt += loc['value'] + ' '
+                    try:
+                        validate_txt += ' '.join([k for k in loc['labels']]) + ' '
+                    except:
+                        pass
+                validate_txt = validate_txt.rstrip() + '\n'
+            validate_txt = validate_txt.replace('\n\n', '\n')
+            d = difflib.SequenceMatcher(a=validate_txt.split('\n'), b=labeled_txt.split('\n'))
+            print("Diff score for ", file, ": ", d.ratio())
 
 
 

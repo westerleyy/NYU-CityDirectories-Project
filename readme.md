@@ -49,4 +49,21 @@ In other words, Tesseract's `psm` and `oem` options might not be suitable in sol
 
 4. hocr-detect columns?
 
-5. CRF extracted features and amount of training data 
+5. CRF extracted features and amount of training data
+
+
+#### Individual Utility Usages
+
+1. qc_json_check.py
+
+Compares the json-format labeled output of the cropped jpeg - to - labeled entries workflow using validation json located in the "hand-corrections" folder of each NYC directory folder.
+
+The output is a score between 0 and 1, with 1 an identical match in a txt diff of two entry pages and 0 having no matches.
+
+Input parameters are -in and -test, where "in" is the directory (with trailing /) containing all _labeled.json files and "test" is the "hand-corrections" directory containing all handmade validation json files.
+
+2. crop_for_columns.py
+
+Crops the downloaded original jpegs in preparation for Tesseract.
+
+Uses three parameters, -type, -in, and -out, where "in" is the directory containing the jpegs, "out" is the directory where cropped jpegs should be placed (for us, "cropped" folder), and -type can be minimal of full, depending on whether an output of the cropped jpeg should be created for inspection.

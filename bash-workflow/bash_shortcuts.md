@@ -18,7 +18,7 @@ Working with JSON in bash:
 
 (to send the unlabeled entries to a text file) or
 
-<pre>for page in *.hocr; do hocr-detect-columns --mode json $page; done | jq .pages[0].lines[].completeText | sed 's/"//1' | sed 's/\\n//g' | tr -s '[:space:]' | python ../../city-directory-entry-parser/parse.py --training ../../city-directory-entry-parser/data/nyc-city-directories/nypl-labeled-70-training.csv</pre>
+<pre>for page in *.hocr; do hocr-detect-columns --mode json $page | jq .pages[0].lines[].completeText | sed 's/"//1' | sed 's/\\n//g' | tr -s '[:space:]' | python ../../city-directory-entry-parser/parse.py --training ../../city-directory-entry-parser/data/nyc-city-directories/nypl-labeled-70-training.csv > "$page"_labeled.json ; done</pre>
 
 (to produce the entire workflow from hocr to labeled entries in json format.
 

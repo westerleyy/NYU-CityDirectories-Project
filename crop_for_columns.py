@@ -53,13 +53,14 @@ def process_image(args):
         M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
         im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
 
-        # Plot and save if a full run
+        # Plot if a full run
+        # Always save deskewed image
         if args.type == "full":
             plt.subplot(111),plt.imshow(im)
             plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
             plt.show()
-            cv2.imwrite(img = im,
-                        filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+        cv2.imwrite(img = im,
+                    filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
         return im
 
     def dilate(ary, N, iterations): 
@@ -276,8 +277,7 @@ def process_image(args):
             #print (uncropped_jpeg)
             cropped_jpeg = uncropped_jpeg[:-5] + "_cropped.jpeg"
             #print(cropped_jpeg)
-        
-        
+           
     orig_im = Image.open(path + uncropped_jpeg)
     scale, im = downscale_image(orig_im)
         

@@ -8,6 +8,8 @@ import re
 import json
 import argparse
 import os
+import uuid
+from cdparser import Classifier, Features, LabeledEntry, Utils
 
 
 def build_manifest(main_path, entries_json):
@@ -76,10 +78,12 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
             hocr_entries[id_num] = words
     entry_id = 0
     for keep_line in line_array:
+        entry_uuid = uuid.uuid1()
         if keep_line[5] == 0:
             entries_json[entry_id] = {
                 'directory_uuid':directory_uuid,
                 'page_uuid':page_uuid,
+                'entry_uuid':entry_uuid.hex,
                 'total_lines_from_hocr':str(total_page_line_count),
                 'original_hocr_line_number':str(keep_line[0]),
                 'bbox':' '.join([str(val) for val in keep_line[1:5]]),
@@ -100,6 +104,7 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
                     entries_json[entry_id] = {
                         'directory_uuid': directory_uuid,
                         'page_uuid': page_uuid,
+                        'entry_uuid': entry_uuid.hex,
                         'total_lines_from_hocr': str(total_page_line_count),
                         'original_hocr_line_number': str(keep_line[0]),
                         'bbox': ' '.join([str(val) for val in keep_line[1:5]]),
@@ -116,6 +121,7 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
                 entries_json[entry_id] = {
                     'directory_uuid': directory_uuid,
                     'page_uuid': page_uuid,
+                    'entry_uuid': entry_uuid.hex,
                     'total_lines_from_hocr': str(total_page_line_count),
                     'original_hocr_line_number': str(keep_line[0]),
                     'bbox': ' '.join([str(val) for val in keep_line[1:5]]),
@@ -297,8 +303,24 @@ def build_entries(args):
             imagebuilder(sorted_line_only_array, [col1_xval, col2_xval], jpeg_path, std1, gap_locations, page_uuid, os.path.join(root, args.bbox_location))
         entries_json = json_from_hocr(sorted_line_only_array, page_html, page_uuid, directory_uuid)
         build_manifest(root, entries_json)
-        print(entries_json)
-    
+        if args.mode == 'P':
+            print(entries_json)
+        else:
+            classifier = Classifier.Classifier()
+            classifier.load_training(args.crf_training_path)
+            classifier.train()
+            for rec in entries_json:
+                entry = LabeledEntry.LabeledEntry(entries_json[rec]['complete_entry'])
+                classifier.label(entry)
+                entries_json[rec]['labeled_entry'] = entry.categories
+                if args.mode == 'CRF-print':
+                    print(entries_json[rec])
+            if args.mode == 'CRF':
+                with open(os.path.join(root, 'final-entries', page_uuid + '_labeled.json'), 'w') as f:
+                    for rec in sorted(entries_json.keys()):
+                        f.write(json.dumps(entries_json[rec]) + '\n')
+                f.close()
+
 
 def main():
     parser=argparse.ArgumentParser(description="Parse hocr files and return entries")
@@ -306,6 +328,8 @@ def main():
     parser.add_argument("-build_image", help="Set whether to make images (True/False)", dest="make_image", default="False", type=str, required=True)
     parser.add_argument("-jpegs",help="Directory containing jpegs" ,dest="jpeg_directory", type=str, required=False)
     parser.add_argument("-bbox_out", help="Directory to place output bbox images", dest="bbox_location", type=str, required=False)
+    parser.add_argument("-mode", help="Either (P)rint out extracted entries, apply (CRF-print) and print out entries, or (CRF) and save JSON entries in labeled-json directory", dest="mode", type=str,required=True)
+    parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=True)
     parser.set_defaults(func=build_entries)
     args=parser.parse_args()
     args.func(args)

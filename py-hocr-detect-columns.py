@@ -7,6 +7,7 @@ from PIL import Image, ImageOps, ImageDraw
 import re
 import json
 import argparse
+import os
 
 
 def build_manifest(main_path, entries_json):
@@ -14,19 +15,21 @@ def build_manifest(main_path, entries_json):
     page_uuid = entries_json[0]['page_uuid']
     num_columns = max([int(entries_json[i]['col']) for i in entries_json])
     num_skipped_lines = len([i for i in entries_json if entries_json[i]['skipped_line_after'] == '1'])
-    manifest_path = main_path.split('/')
-    manifest_path.pop()
-    manifest_path = '/'.join(manifest_path) + '/manifest/' + directory_uuid + '_manifest.txt'
+    if not os.path.exists(os.path.join(main_path, 'manifest')):
+        os.makedirs(os.path.join(main_path, 'manifest'))
+    manifest_path = os.path.join(main_path, 'manifest', directory_uuid + '_manifest.txt')
     with open(manifest_path, 'a') as f:
         f.write('directory_uuid:' + directory_uuid + '\n')
         f.write('page_uuid:' + page_uuid + '\n')
-        f.write('number_entries:' + str(len(entries_json)) + '\n')
-        f.write('number_columns:' + str(num_columns) + '\n')
+        f.write('number_extracted_entries:' + str(len(entries_json)) + '\n')
+        f.write('total_number_lines_hocr:' + entries_json[0]['total_lines_from_hocr'] + '\n')
+        f.write('number_extracted_columns:' + str(num_columns) + '\n')
         f.write('number_skipped_lines:' + str(num_skipped_lines))
         f.write('\n\n')
     f.close()
 
-def imagebuilder(r, col_locations, image_filename, std1, gap_locations):
+def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uuid, output_directory):
+    print(image_filename)
     pageimg = Image.open(image_filename)
     overlay = ImageDraw.Draw(pageimg, 'RGBA')
 
@@ -58,14 +61,16 @@ def imagebuilder(r, col_locations, image_filename, std1, gap_locations):
                      fill=(0, 0, 0, 127), width=4)
 
 
-    pageimg.show()
+    pageimg.save(os.path.join(output_directory, page_uuid + '.jpeg'), 'JPEG')
 
 
 def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
     hocr_entries = {}
     entries_json = {}
+    total_page_line_count = 0
     for line in page_html.html.body.div.find_all('span'):
         if line['class'][0] == 'ocr_line':
+            total_page_line_count+=1
             id_num = int(line['id'].split('_')[2])
             words = ' '.join([word.string.replace('\n','').strip() for word in line.children])
             hocr_entries[id_num] = words
@@ -75,7 +80,8 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
             entries_json[entry_id] = {
                 'directory_uuid':directory_uuid,
                 'page_uuid':page_uuid,
-                'original_hocr_line_num':str(keep_line[0]),
+                'total_lines_from_hocr':str(total_page_line_count),
+                'original_hocr_line_number':str(keep_line[0]),
                 'bbox':' '.join([str(val) for val in keep_line[1:5]]),
                 'col':str(keep_line[6]),
                 'appended':'no',
@@ -94,7 +100,8 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
                     entries_json[entry_id] = {
                         'directory_uuid': directory_uuid,
                         'page_uuid': page_uuid,
-                        'original_hocr_line_num': str(keep_line[0]),
+                        'total_lines_from_hocr': str(total_page_line_count),
+                        'original_hocr_line_number': str(keep_line[0]),
                         'bbox': ' '.join([str(val) for val in keep_line[1:5]]),
                         'col':str(keep_line[6]),
                         'appended':'no',
@@ -109,7 +116,8 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
                 entries_json[entry_id] = {
                     'directory_uuid': directory_uuid,
                     'page_uuid': page_uuid,
-                    'original_hocr_line_num': str(keep_line[0]),
+                    'total_lines_from_hocr': str(total_page_line_count),
+                    'original_hocr_line_number': str(keep_line[0]),
                     'bbox': ' '.join([str(val) for val in keep_line[1:5]]),
                     'col':str(keep_line[6]),
                     'appended':'no',
@@ -144,154 +152,160 @@ def build_entries(args):
     col 5 = 0:col line; 1: indent line; 2:kill line
     col 6 = 1:col 1; 2: col2 (column assignment)
     col 7 = 0:ok to append, 1: do not append (likely gap)"""
-    
-    page_uuid, directory_uuid = args.path.replace('_cropped.hocr','').split('/')[-1:-3:-1]
-    raw_hocr_array, page_html = load_hocr_lines(args.path)
-    jpeg_path = args.jpeg_directory + page_uuid + '_cropped.jpeg'
-    
-    ##
-    #   Find our likely column locations
-    ##
-    
-    kmeans = KMeans(n_clusters=8).fit(raw_hocr_array[:,1].reshape(-1,1))
-    centroids = kmeans.cluster_centers_
-    cands_cols = {}
-    
-    
-    for j in range(len(centroids)):
-        cands_cols[centroids[j,0]] = 0
-        std = sqrt(mean([((i - centroids[j,0])**2) for i in raw_hocr_array[:,1]]))
+
+    root = '/'.join(args.path.split('/')[:-1])
+    directory_uuid = root.split('/')[-1]
+    hocr_files = [file for file in os.listdir(args.path) if file.endswith('_cropped.hocr')]
+
+    for hocr_file in hocr_files:
+        page_uuid = hocr_file.replace('_cropped.hocr','')
+        raw_hocr_array, page_html = load_hocr_lines(os.path.join(args.path, hocr_file))
+        jpeg_path = os.path.join(root, args.jpeg_directory, page_uuid + '_cropped.jpeg')
+
+        ##
+        #   Find our likely column locations
+        ##
+
+        kmeans = KMeans(n_clusters=8).fit(raw_hocr_array[:,1].reshape(-1,1))
+        centroids = kmeans.cluster_centers_
+        cands_cols = {}
+
+
+        for j in range(len(centroids)):
+            cands_cols[centroids[j,0]] = 0
+            std = sqrt(mean([((i - centroids[j,0])**2) for i in raw_hocr_array[:,1]]))
+            for i in range(len(raw_hocr_array)):
+                if abs(raw_hocr_array[i:i+1,1] - centroids[j,0]) > (std/16):
+                    pass
+                else:
+                    cands_cols[centroids[j,0]]+=1
+
+        # We have our dict of possible column location along with the number of entries proximate to each
+        # But in case our k-means clustering was compromised by a slanted column line (yielding double col locations)
+        # we need to check for that and take an average of the resultant double col1 and double col2 locations
+
+        halfway_page_rough = (max(raw_hocr_array[:,1])/2)*.95
+        lefthand_cands = [i for i in cands_cols.items() if i[0] < halfway_page_rough]
+        righthand_cands = [i for i in cands_cols.items()if i[0] > halfway_page_rough]
+        col1_xval_cands = sorted(lefthand_cands, key=lambda x: x[1], reverse=True)
+        col2_xval_cands = sorted(righthand_cands, key=lambda x: x[1], reverse=True)
+
+        # Now that we've split our candidate locations into what we think is roughly the col1 and col2 areas
+        # we look for two closely proximate top candidates. If they exist, we average them out
+
+        if abs(col1_xval_cands[0][0] - col1_xval_cands[1][0]) < 50:
+            col1_xval = mean([col1_xval_cands[0][0], col1_xval_cands[1][0]])
+        else:
+            col1_xval = col1_xval_cands[0][0]
+        if abs(col2_xval_cands[0][0] - col2_xval_cands[1][0]) < 50:
+            col2_xval = mean([col2_xval_cands[0][0], col2_xval_cands[1][0]])
+        else:
+            col2_xval = col2_xval_cands[0][0]
+
+        ##
+        #  Pass to identify and keep lines that are at x-val of column edges
+        ##
+
+        std1 = sqrt(mean([((i - col1_xval)**2) for i in raw_hocr_array[:, 1]]))/16
+        std2 = sqrt(mean([((i - col2_xval)**2) for i in raw_hocr_array[:, 1]]))/16
         for i in range(len(raw_hocr_array)):
-            if abs(raw_hocr_array[i:i+1,1] - centroids[j,0]) > (std/16):
-                pass
-            else:
-                cands_cols[centroids[j,0]]+=1
-    
-    # We have our dict of possible column location along with the number of entries proximate to each
-    # But in case our k-means clustering was compromised by a slanted column line (yielding double col locations)
-    # we need to check for that and take an average of the resultant double col1 and double col2 locations
-    
-    halfway_page_rough = (max(raw_hocr_array[:,1])/2)*.95
-    lefthand_cands = [i for i in cands_cols.items() if i[0] < halfway_page_rough]
-    righthand_cands = [i for i in cands_cols.items()if i[0] > halfway_page_rough]
-    col1_xval_cands = sorted(lefthand_cands, key=lambda x: x[1], reverse=True)
-    col2_xval_cands = sorted(righthand_cands, key=lambda x: x[1], reverse=True)
-    
-    # Now that we've split our candidate locations into what we think is roughly the col1 and col2 areas
-    # we look for two closely proximate top candidates. If they exist, we average them out
-    
-    if abs(col1_xval_cands[0][0] - col1_xval_cands[1][0]) < 50:
-        col1_xval = mean([col1_xval_cands[0][0], col1_xval_cands[1][0]])
-    else:
-        col1_xval = col1_xval_cands[0][0]
-    if abs(col2_xval_cands[0][0] - col2_xval_cands[1][0]) < 50:
-        col2_xval = mean([col2_xval_cands[0][0], col2_xval_cands[1][0]])
-    else:
-        col2_xval = col2_xval_cands[0][0]
-    
-    ##
-    #  Pass to identify and keep lines that are at x-val of column edges
-    ##
-    
-    std1 = sqrt(mean([((i - col1_xval)**2) for i in raw_hocr_array[:, 1]]))/16
-    std2 = sqrt(mean([((i - col2_xval)**2) for i in raw_hocr_array[:, 1]]))/16
-    for i in range(len(raw_hocr_array)):
-        if abs(raw_hocr_array[i:i + 1, 1] - col1_xval) < std1 or abs(raw_hocr_array[i:i + 1, 1] - col2_xval) < std2:
-            # Col 1 identification:
-            if abs(raw_hocr_array[i:i + 1, 1] - col1_xval) < std1:
+            if abs(raw_hocr_array[i:i + 1, 1] - col1_xval) < std1 or abs(raw_hocr_array[i:i + 1, 1] - col2_xval) < std2:
+                # Col 1 identification:
+                if abs(raw_hocr_array[i:i + 1, 1] - col1_xval) < std1:
+                    raw_hocr_array[i:i + 1, 6] = 1
+                # Col 2 identification:
+                elif abs(raw_hocr_array[i:i + 1, 1] - col2_xval) < std2:
+                    raw_hocr_array[i:i + 1, 6] = 2
+            #Id of indents and any potential chopped off lines to right of columns
+            elif raw_hocr_array[i:i + 1, 1] - (col1_xval + std1) > 0 and raw_hocr_array[i:i + 1, 1] < col2_xval:
+                #Col 1 indents identification
+                raw_hocr_array[i:i + 1, 5] = 1
                 raw_hocr_array[i:i + 1, 6] = 1
-            # Col 2 identification:
-            elif abs(raw_hocr_array[i:i + 1, 1] - col2_xval) < std2:
+            elif raw_hocr_array[i:i + 1, 1] - (col2_xval + std2) > 0:
+                # Col 2 indents identification
+                raw_hocr_array[i:i + 1, 5] = 1
                 raw_hocr_array[i:i + 1, 6] = 2
-        #Id of indents and any potential chopped off lines to right of columns
-        elif raw_hocr_array[i:i + 1, 1] - (col1_xval + std1) > 0 and raw_hocr_array[i:i + 1, 1] < col2_xval:
-            #Col 1 indents identification
-            raw_hocr_array[i:i + 1, 5] = 1
-            raw_hocr_array[i:i + 1, 6] = 1
-        elif raw_hocr_array[i:i + 1, 1] - (col2_xval + std2) > 0:
-            # Col 2 indents identification
-            raw_hocr_array[i:i + 1, 5] = 1
-            raw_hocr_array[i:i + 1, 6] = 2
-        #Eliminating anything to left of column 1
-        if raw_hocr_array[i:i+1, 1] < (col1_xval - std1):
-           raw_hocr_array[i:i + 1, 5] = 2
-         # Eliminating anything to right of column 2 right edge
-        if raw_hocr_array[i:i + 1, 1] > (col2_xval + (col2_xval - col1_xval)):
-           raw_hocr_array[i:i + 1, 5] = 2
-        
-     
-    ##
-    #   Pass to find lines flush with a column whose y vals make them unlikely to be in the page block for entries
-    ##
-    
-    reduced_array = raw_hocr_array[raw_hocr_array[:,5] !=2]
-    sorted_y_array = np.sort(reduced_array.view('i8,i8,i8,i8,i8,i8,i8,i8'), order=['f2'], axis=0).view(np.int)
-    
-    # To find an appropriate vertical line density of all likely lines, we grab a sample at a point roughly 1/4
-    # the way through our entries, then gather the line density at that point within a gap around that point
-    # The gap is calculated at 0.5% of the highest yval (roughly 0.5% of the yval height of the page) 
-    
-    quarter_page = len(sorted_y_array)//4
-    gap = float(max(raw_hocr_array[:,2]))*.05
-    entry_density = len([i for i in sorted_y_array[:,2] if abs(i - sorted_y_array[quarter_page:quarter_page+1,2]) < gap/2])
-    
-    # We now examine the line density around every line in the page; if the density is low, we do a second check to make
-    # sure the reason isn't that it is a first or last line; in those cases we check for gap density after/before the line
-    # Anything that still fails we cut
-    
-    for i in range(len(sorted_y_array)):
-        proximate_lines = [yval for yval in sorted_y_array[:,2] if abs(yval - sorted_y_array[i:i+1,2]) < gap/2]
-        if len(proximate_lines) - 1 < entry_density/2:
-            top_line_proximate_lines = [yval for yval in sorted_y_array[:, 2] if yval - sorted_y_array[i:i + 1, 2] < gap \
-                                        and yval - sorted_y_array[i:i + 1, 2] > 0]
-            bottom_line_proximate_lines = [yval for yval in sorted_y_array[:, 2] if \
-                                        sorted_y_array[i:i + 1, 2] - yval < gap and sorted_y_array[i:i + 1, 2] - yval > 0]
-            if len(top_line_proximate_lines) > entry_density or len(bottom_line_proximate_lines) > entry_density:
+            #Eliminating anything to left of column 1
+            if raw_hocr_array[i:i+1, 1] < (col1_xval - std1):
+               raw_hocr_array[i:i + 1, 5] = 2
+             # Eliminating anything to right of column 2 right edge
+            if raw_hocr_array[i:i + 1, 1] > (col2_xval + (col2_xval - col1_xval)):
+               raw_hocr_array[i:i + 1, 5] = 2
+
+
+        ##
+        #   Pass to find lines flush with a column whose y vals make them unlikely to be in the page block for entries
+        ##
+
+        reduced_array = raw_hocr_array[raw_hocr_array[:,5] !=2]
+        sorted_y_array = np.sort(reduced_array.view('i8,i8,i8,i8,i8,i8,i8,i8'), order=['f2'], axis=0).view(np.int)
+
+        # To find an appropriate vertical line density of all likely lines, we grab a sample at a point roughly 1/4
+        # the way through our entries, then gather the line density at that point within a gap around that point
+        # The gap is calculated at 0.5% of the highest yval (roughly 0.5% of the yval height of the page)
+
+        quarter_page = len(sorted_y_array)//4
+        gap = float(max(raw_hocr_array[:,2]))*.05
+        entry_density = len([i for i in sorted_y_array[:,2] if abs(i - sorted_y_array[quarter_page:quarter_page+1,2]) < gap/2])
+
+        # We now examine the line density around every line in the page; if the density is low, we do a second check to make
+        # sure the reason isn't that it is a first or last line; in those cases we check for gap density after/before the line
+        # Anything that still fails we cut
+
+        for i in range(len(sorted_y_array)):
+            proximate_lines = [yval for yval in sorted_y_array[:,2] if abs(yval - sorted_y_array[i:i+1,2]) < gap/2]
+            if len(proximate_lines) - 1 < entry_density/2:
+                top_line_proximate_lines = [yval for yval in sorted_y_array[:, 2] if yval - sorted_y_array[i:i + 1, 2] < gap \
+                                            and yval - sorted_y_array[i:i + 1, 2] > 0]
+                bottom_line_proximate_lines = [yval for yval in sorted_y_array[:, 2] if \
+                                            sorted_y_array[i:i + 1, 2] - yval < gap and sorted_y_array[i:i + 1, 2] - yval > 0]
+                if len(top_line_proximate_lines) > entry_density or len(bottom_line_proximate_lines) > entry_density:
+                    pass
+                else:
+                    sorted_y_array[i:i+1,5] = 2
+
+        ##
+        #   Pass to look for missing lines by finding no line with a yval that is 1.95% of the expected space
+        #   between lines; if a missing line is found, we mark the previous line to make sure an indent isn't appended to that line
+        #   Those indents following a gap will become a standalone line because their head-entry is missing
+        ##
+
+        line_only_array = sorted_y_array[sorted_y_array[:,5] != 2]
+        sorted_line_only_array = np.sort(line_only_array.view('i8,i8,i8,i8,i8,i8,i8,i8'), order=['f6','f2'], axis=0).view(np.int)
+        sample_lines = sorted_line_only_array[sorted_line_only_array[:,6] == 1]
+        gaps = []
+
+        for i in range(len(sample_lines)):
+            try:
+                gaps.append(int(sample_lines[i+1:i+2,2] - sample_lines[i:i+1,2]))
+            except:
                 pass
-            else:
-                sorted_y_array[i:i+1,5] = 2
-            
-    ##
-    #   Pass to look for missing lines by finding no line with a yval that is 1.95% of the expected space
-    #   between lines; if a missing line is found, we mark the previous line to make sure an indent isn't appended to that line
-    #   Those indents following a gap will become a standalone line because their head-entry is missing
-    ##
-    
-    line_only_array = sorted_y_array[sorted_y_array[:,5] != 2]
-    sorted_line_only_array = np.sort(line_only_array.view('i8,i8,i8,i8,i8,i8,i8,i8'), order=['f6','f2'], axis=0).view(np.int)
-    sample_lines = sorted_line_only_array[sorted_line_only_array[:,6] == 1]
-    gaps = []
-    
-    for i in range(len(sample_lines)):
-        try:
-            gaps.append(int(sample_lines[i+1:i+2,2] - sample_lines[i:i+1,2]))
-        except:
-            pass
-    
-    average_line_gap = sum(gaps) // len(sample_lines)
-    gap_locations = []
-    for i in range(len(sorted_line_only_array)):
-        try:
-            if int(sorted_line_only_array[i + 1:i + 2, 2] - sorted_line_only_array[i:i + 1, 2]) > average_line_gap*1.95:
-                sorted_line_only_array[i:i+1,7] = 1
-                gap_locations.append(sorted_line_only_array[i:i + 1, 2] + average_line_gap*1.5)
-        except:
-            pass
-    
-    # Now we can either build the image or return the json
-    
-    if args.make_image:
-        imagebuilder(sorted_line_only_array, [col1_xval, col2_xval], jpeg_path, std1, gap_locations)
-    entries_json = json_from_hocr(sorted_line_only_array, page_html, page_uuid, directory_uuid)
-    build_manifest(args.path, entries_json)
-    print(entries_json)
+
+        average_line_gap = sum(gaps) // len(sample_lines)
+        gap_locations = []
+        for i in range(len(sorted_line_only_array)):
+            try:
+                if int(sorted_line_only_array[i + 1:i + 2, 2] - sorted_line_only_array[i:i + 1, 2]) > average_line_gap*1.95:
+                    sorted_line_only_array[i:i+1,7] = 1
+                    gap_locations.append(sorted_line_only_array[i:i + 1, 2] + average_line_gap*1.5)
+            except:
+                pass
+
+        # We can either build the image or return the json
+
+        if args.make_image == 'True':
+            imagebuilder(sorted_line_only_array, [col1_xval, col2_xval], jpeg_path, std1, gap_locations, page_uuid, os.path.join(root, args.bbox_location))
+        entries_json = json_from_hocr(sorted_line_only_array, page_html, page_uuid, directory_uuid)
+        build_manifest(root, entries_json)
+        print(entries_json)
     
 
 def main():
     parser=argparse.ArgumentParser(description="Parse hocr files and return entries")
-    parser.add_argument("-in", help = "Input hocr file", dest="path", type=str, required=True)
-    parser.add_argument("-jpegs",help="Cropped jpegs files directory" ,dest="jpeg_directory", type=str, required=True)
-    parser.add_argument("-image", help="Set whether to make images ", dest="make_image", type=bool, required=True)
+    parser.add_argument("-in", help = "Directory containing hocr files", dest="path", type=str, required=True)
+    parser.add_argument("-build_image", help="Set whether to make images (True/False)", dest="make_image", default="False", type=str, required=True)
+    parser.add_argument("-jpegs",help="Directory containing jpegs" ,dest="jpeg_directory", type=str, required=False)
+    parser.add_argument("-bbox_out", help="Directory to place output bbox images", dest="bbox_location", type=str, required=False)
     parser.set_defaults(func=build_entries)
     args=parser.parse_args()
     args.func(args)

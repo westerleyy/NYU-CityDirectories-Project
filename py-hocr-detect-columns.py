@@ -75,7 +75,7 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
             total_page_line_count+=1
             id_num = int(line['id'].split('_')[2])
             words = ' '.join([word.string.replace('\n','').strip() for word in line.children])
-            hocr_entries[id_num] = words
+            hocr_entries[id_num] = normalize_entry(words)
     entry_id = 0
     for keep_line in line_array:
         entry_uuid = uuid.uuid1()
@@ -98,7 +98,10 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
         else:   
             try:
                 if entries_json[entry_id - 1]['skipped_line_after'] != "1":
-                    entries_json[entry_id - 1]['complete_entry']+= ' ' + hocr_entries[keep_line[0]]
+                    if entries_json[entry_id - 1]['complete_entry'][-1] == '-':
+                        entries_json[entry_id - 1]['complete_entry']+= hocr_entries[keep_line[0]]
+                    else:
+                        entries_json[entry_id - 1]['complete_entry'] += ' ' + hocr_entries[keep_line[0]]
                     entries_json[entry_id - 1]['appended'] = 'yes'
                 else:
                     entries_json[entry_id] = {
@@ -148,6 +151,13 @@ def load_hocr_lines(filepath):
             line_list += [0,0,0]
             page_array.append(line_list)
     return np.array(page_array), rawhtml
+
+
+def normalize_entry(entry):
+    replacements = [("‘","'"),("’","'"),(" ay."," av."),(" ay,"," av,"),("- ","-"),(" -","-")]
+    for swap in replacements:
+        entry = entry.replace(swap[0], swap[1])
+    return ' '.join(entry.split())
 
 
 def build_entries(args):

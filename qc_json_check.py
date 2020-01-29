@@ -34,7 +34,7 @@ def check_json(args):
                     labeled_txt += loc['value'] + ' '
                 labeled_txt = labeled_txt.rstrip() + '\n'
             labeled_txt = labeled_txt.replace('\n\n', '\n')
-            #print(labeled_txt)
+            print(labeled_txt)
             with open(os.path.join(args.test, file.replace('_labeled.json','_validate_labeled.json'))) as f:
                 validate_json = json.loads(f.read())
             f.close()
@@ -51,7 +51,7 @@ def check_json(args):
                     validate_txt += loc['value'] + ' '
                 validate_txt = validate_txt.rstrip() + '\n'
             validate_txt = validate_txt.replace('\n\n', '\n')
-            #print(validate_txt)
+            print(validate_txt)
             d = difflib.SequenceMatcher(a=validate_txt.split('\n'), b=labeled_txt.split('\n'))
             print("Diff score for ", file, ": ", d.ratio())
 

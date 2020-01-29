@@ -160,6 +160,32 @@ def normalize_entry(entry):
     return ' '.join(entry.split())
 
 
+def remove_precede_space(entry):
+    if re.search(r'\s\.|\s\,', entry):
+        entry = entry.replace(' .', '.').replace(' ,', ',')
+    return entry
+
+def normalize_labeled_entry(labeled_entry_dict):
+    new_subjects = []
+    for subject in labeled_entry_dict['subjects']:
+        new_subjects.append(remove_precede_space(subject))
+    labeled_entry_dict['subjects'] = new_subjects
+    new_occs = []
+    for occ in labeled_entry_dict['occupations']:
+        new_occs.append(remove_precede_space(occ))
+    labeled_entry_dict['occupations'] = new_occs
+    new_locations = []
+    for loc_dict in labeled_entry_dict['locations']:
+        new_loc_dict = {}
+        new_loc_dict['value'] = remove_precede_space(loc_dict['value'])
+        try:
+            new_loc_dict['labels'] = loc_dict['labels']
+        except:
+            pass
+        new_locations.append(new_loc_dict)
+    labeled_entry_dict['locations'] = new_locations
+    return labeled_entry_dict
+
 def build_entries(args):
     """
     Page Array Structure
@@ -322,7 +348,8 @@ def build_entries(args):
             for rec in entries_json:
                 entry = LabeledEntry.LabeledEntry(entries_json[rec]['complete_entry'])
                 classifier.label(entry)
-                entries_json[rec]['labeled_entry'] = entry.categories
+                final_entries = normalize_labeled_entry(entry.categories)
+                entries_json[rec]['labeled_entry'] = final_entries
                 if args.mode == 'CRF-print':
                     print(entries_json[rec])
             if args.mode == 'CRF':

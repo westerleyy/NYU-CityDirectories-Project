@@ -14,54 +14,106 @@ def process_image(args):
     path = args.input
     out_path = args.output
     
-    def deskew(im, save_directory, max_skew=10):
-        height, width = im.shape[:2]
-        print(height)
-        print(width)
+    def deskew(im, save_directory, direct, max_skew=10):
+        if direct == "Y":
+            height, width = im.shape[:2]
+            print(height)
+            print(width)
 
-        # Create a grayscale image and denoise it
-        im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
+            # Create a grayscale image and denoise it
+            im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
 
-        # Create an inverted B&W copy using Otsu (automatic) thresholding
-        im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+            # Create an inverted B&W copy using Otsu (automatic) thresholding
+            im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-        # Detect lines in this image. Parameters here mostly arrived at by trial and error.
-        lines = cv2.HoughLinesP(
-            im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
-        )
+            # Detect lines in this image. Parameters here mostly arrived at by trial and error.
+            lines = cv2.HoughLinesP(
+                im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
+            )
 
-        # Collect the angles of these lines (in radians)
-        angles = []
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            geom = np.arctan2(y2 - y1, x2 - x1)
-            print(np.rad2deg(geom))
-            angles.append(geom)
+            # Collect the angles of these lines (in radians)
+            angles = []
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                geom = np.arctan2(y2 - y1, x2 - x1)
+                print(np.rad2deg(geom))
+                angles.append(geom)
 
-        angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
+            angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
 
-        if len(angles) < 5:
-            # Insufficient data to deskew
-            print("Insufficient data to deskew. Input image might already be straight. Check printout above.")
+            if len(angles) < 5:
+                # Insufficient data to deskew
+                print("Insufficient data to deskew. Cropped image might already be straight. Cropped image saved.")
+                text_im.save(out_path + cropped_jpeg_list[pg_count])
+                return im
+
+            # Average the angles to a degree offset
+            angle_deg = np.rad2deg(np.median(angles))
+
+            # Rotate the image by the residual offset
+            M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
+            im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+
+            # Plot if a full run
+            # Always save deskewed image
+            if args.type == "full":
+                plt.subplot(111),plt.imshow(im)
+                plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+                plt.show()
+            cropped_jpeg = cropped_jpeg_list[pg_count]
+            cv2.imwrite(img = im,
+                        filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
             return im
+        else:
+            height, width = im.shape[:2]
+            print(height)
+            print(width)
 
-        # Average the angles to a degree offset
-        angle_deg = np.rad2deg(np.median(angles))
+            # Create a grayscale image and denoise it
+            im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
 
-        # Rotate the image by the residual offset
-        M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
-        im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+            # Create an inverted B&W copy using Otsu (automatic) thresholding
+            im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-        # Plot if a full run
-        # Always save deskewed image
-        if args.type == "full":
-            plt.subplot(111),plt.imshow(im)
-            plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
-            plt.show()
-        cv2.imwrite(img = im,
-                    filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
-        return im
+            # Detect lines in this image. Parameters here mostly arrived at by trial and error.
+            lines = cv2.HoughLinesP(
+                im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
+            )
+
+            # Collect the angles of these lines (in radians)
+            angles = []
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                geom = np.arctan2(y2 - y1, x2 - x1)
+                print(np.rad2deg(geom))
+                angles.append(geom)
+
+            angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
+
+            if len(angles) < 5:
+                # Insufficient data to deskew
+                print("Insufficient data to deskew. Cropped image might already be straight.")
+                return im
+
+            # Average the angles to a degree offset
+            angle_deg = np.rad2deg(np.median(angles))
+
+            # Rotate the image by the residual offset
+            M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
+            im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+
+            # Plot if a full run
+            # Always save deskewed image
+            if args.type == "full":
+                plt.subplot(111), plt.imshow(im)
+                plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+                plt.show()
+            cropped_jpeg = cropped_jpeg_list[pg_count]
+            cv2.imwrite(img=im,
+                        filename=save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+            return im
 
     def dilate(ary, N, iterations): 
         """Dilate using an NxN '+' sign shape. ary is np.uint8."""
@@ -268,80 +320,108 @@ def process_image(args):
         scale = 1.0 * max_dim / max(a, b)
         new_im = im.resize((int(a * scale), int(b * scale)), Image.ANTIALIAS)
         return scale, new_im
-    
-    uncropped_jpeg = ""
-    cropped_jpeg = ""
+
+    # Creates an empty list that takes on the filename of each jpeg in the directory
+    # Then, it will loop through every single one of them
+    uncropped_jpeg_list = []
+    cropped_jpeg_list = []
     for file in os.listdir(path):
+        uncropped_jpeg_temp = ""
+        cropped_jpeg_temp = ""
         if file.endswith('.jpeg'):
-            uncropped_jpeg = "/" + file
-            #print (uncropped_jpeg)
-            cropped_jpeg = uncropped_jpeg[:-5] + "_cropped.jpeg"
-            #print(cropped_jpeg)
-           
-    orig_im = Image.open(path + uncropped_jpeg)
-    scale, im = downscale_image(orig_im)
-        
-    # Apply dilation and erosion to remove some noise    
-    kernel = np.ones((1, 1), np.uint8)    
-    img = cv2.dilate(np.asarray(im), kernel, iterations=1)    
-    img = cv2.erode(img, kernel, iterations=1) 
-    
-    # Detect edge and plot
-    edges = cv2.Canny(img, 100, 400)
+            uncropped_jpeg_temp = "/" + file
+            # print (uncropped_jpeg)
+            cropped_jpeg_temp = uncropped_jpeg_temp[:-5] + "_cropped.jpeg"
+            uncropped_jpeg_list.append(uncropped_jpeg_temp)
+            cropped_jpeg_list.append(cropped_jpeg_temp)
+            # print(cropped_jpeg)
 
-    if args.type == "full":
-        plt.subplot(111),plt.imshow(edges,cmap = 'gray')
-        plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
+    pg_count = 0
+    for uncropped_jpeg in uncropped_jpeg_list:
+        orig_im = Image.open(path + uncropped_jpeg)
+        scale, im = downscale_image(orig_im)
 
-        plt.show()
+        # Apply dilation and erosion to remove some noise
+        kernel = np.ones((1, 1), np.uint8)
+        img = cv2.dilate(np.asarray(im), kernel, iterations=1)
+        img = cv2.erode(img, kernel, iterations=1)
 
-    # TODO: dilate image _before_ finding a border. This is crazy sensitive!
-    contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    borders = find_border_components(contours, edges)
-    borders.sort(key=lambda i, x1, y1, x2, y2: (x2 - x1) * (y2 - y1))
+        # Detect edge and plot
+        edges = cv2.Canny(img, 100, 400)
 
-    border_contour = None
-    if len(borders):
-        border_contour = contours[borders[0][0]]
-        edges = remove_border(border_contour, edges)
+        if args.type == "full":
+            plt.subplot(111),plt.imshow(edges,cmap = 'gray')
+            plt.title('Edge Image'), plt.xticks([]), plt.yticks([])
 
-    edges = 255 * (edges > 0).astype(np.uint8)
+            plt.show()
 
-    # Remove ~1px borders using a rank filter.
-    maxed_rows = rank_filter(edges, -4, size=(1, 20))
-    maxed_cols = rank_filter(edges, -4, size=(20, 1))
-    debordered = np.minimum(np.minimum(edges, maxed_rows), maxed_cols)
-    edges = debordered
+        # TODO: dilate image _before_ finding a border. This is crazy sensitive!
+        contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        borders = find_border_components(contours, edges)
+        borders.sort(key=lambda i, x1, y1, x2, y2: (x2 - x1) * (y2 - y1))
 
-    contours = find_components(edges)
-    if len(contours) == 0:
-#        print '%s -> (no text!)' % path
-        return
+        border_contour = None
+        if len(borders):
+            border_contour = contours[borders[0][0]]
+            edges = remove_border(border_contour, edges)
 
-    crop = find_optimal_components_subset(contours, edges)
-    crop = pad_crop(crop, contours, edges, border_contour)
+        edges = 255 * (edges > 0).astype(np.uint8)
 
-    crop = [int(x / scale) for x in crop]  # upscale to the original image size.
-    draw = ImageDraw.Draw(im)
-    c_info = props_for_contours(contours, edges)
-    for c in c_info:
-        this_crop = c['x1'], c['y1'], c['x2'], c['y2']
-        draw.rectangle(this_crop, outline='blue')
-    draw.rectangle(crop, outline='red')
-    im.save(out_path + cropped_jpeg)
-    draw.text((50, 50), path, fill='red')
-    orig_im.save(out_path + cropped_jpeg)
-    if args.type == "full":
-        im.show()
-    text_im = orig_im.crop(crop)
-    text_im.save(out_path + cropped_jpeg)
-#    print '%s -> %s' % (path, out_path)
+        # Remove ~1px borders using a rank filter.
+        maxed_rows = rank_filter(edges, -4, size=(1, 20))
+        maxed_cols = rank_filter(edges, -4, size=(20, 1))
+        debordered = np.minimum(np.minimum(edges, maxed_rows), maxed_cols)
+        edges = debordered
 
-    # Deskew image 
-    cropped_image = cv2.imread(out_path + cropped_jpeg)
-    print("Cropped image read")
-    deskewed_image = deskew(im = cropped_image, 
-                            save_directory = out_path)
+        contours = find_components(edges)
+        if len(contours) == 0:
+    #        print '%s -> (no text!)' % path
+            return
+
+        crop = find_optimal_components_subset(contours, edges)
+        crop = pad_crop(crop, contours, edges, border_contour)
+
+        crop = [int(x / scale) for x in crop]  # upscale to the original image size.
+        draw = ImageDraw.Draw(im)
+        c_info = props_for_contours(contours, edges)
+        for c in c_info:
+            this_crop = c['x1'], c['y1'], c['x2'], c['y2']
+            draw.rectangle(this_crop, outline='blue')
+        draw.rectangle(crop, outline='red')
+        im.save(out_path + cropped_jpeg_list[pg_count])
+        draw.text((50, 50), path, fill='red')
+        orig_im.save(out_path + cropped_jpeg_list[pg_count])
+        if args.type == "full":
+            im.show()
+        text_im = orig_im.crop(crop)
+    #    text_im.save(out_path + cropped_jpeg_list[pg_count])
+    #    print '%s -> %s' % (path, out_path)
+
+        # Deskew image
+        # Unsure if deskew will accept the image from above so this is a quick fix until I know if it actually can
+        direct_wo_saving = ""
+        try:
+            try:
+                direct_wo_saving = "Y"
+                deskewed_image = deskew(im=text_im,
+                                        save_directory=out_path,
+                                        direct=direct_wo_saving)
+                print("Deskew complete.")
+            except:
+                cropped_image = cv2.imread(text_im)
+                print("Cropped image read directly without saving to file")
+                direct_wo_saving = "Y"
+                deskewed_image = deskew(im=text_im,
+                                        save_directory=out_path,
+                                        direct=direct_wo_saving)
+        except:
+            direct_wo_saving = "N"
+            text_im.save(out_path + cropped_jpeg_list[pg_count])
+            cropped_image = cv2.imread(out_path + cropped_jpeg_list[pg_count])
+            print("Cropped image saved to, and read from file")
+            deskewed_image = deskew(im=cropped_image,
+                                    save_directory=out_path,
+                                    direct=direct_wo_saving)
 
 
 def main():

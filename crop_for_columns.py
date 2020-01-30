@@ -394,6 +394,10 @@ def process_image(args):
         if args.type == "full":
             im.show()
         text_im = orig_im.crop(crop)
+        try:
+            print(type(text_im))
+        except:
+            print("")
     #    text_im.save(out_path + cropped_jpeg_list[pg_count])
     #    print '%s -> %s' % (path, out_path)
 
@@ -403,17 +407,23 @@ def process_image(args):
         try:
             try:
                 direct_wo_saving = "Y"
-                deskewed_image = deskew(im=text_im,
+                open_cv_image = np.array(text_im)
+                # Convert RGB to BGR
+                open_cv_image = open_cv_image[:, :, ::-1].copy()
+                deskewed_image = deskew(im=open_cv_image,
                                         save_directory=out_path,
                                         direct=direct_wo_saving)
-                print("Deskew complete.")
+                pg_count += 1
+                print("Deskew complete. v 1.0")
             except:
                 cropped_image = cv2.imread(text_im)
                 print("Cropped image read directly without saving to file")
                 direct_wo_saving = "Y"
-                deskewed_image = deskew(im=text_im,
+                deskewed_image = deskew(im=cropped_image,
                                         save_directory=out_path,
                                         direct=direct_wo_saving)
+                pg_count += 1
+                print("Deskew complete. v 2.0")
         except:
             direct_wo_saving = "N"
             text_im.save(out_path + cropped_jpeg_list[pg_count])

@@ -21,8 +21,11 @@ def process_image(args):
             print(width)
 
             # Create a grayscale image and denoise it
-            im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-            im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
+            if channels != 0:
+                im_gs = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+                im_gs = cv2.fastNlMeansDenoising(im_gs, h=3)
+            else:
+                im_gs = cv2.fastNlMeansDenoising(im, h=3)
 
             # Create an inverted B&W copy using Otsu (automatic) thresholding
             im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
@@ -45,26 +48,33 @@ def process_image(args):
             if len(angles) < 5:
                 # Insufficient data to deskew
                 print("Insufficient data to deskew. Cropped image might already be straight. Cropped image saved.")
-                text_im.save(out_path + cropped_jpeg_list[pg_count])
+                cv2.imwrite(img=im,
+                            filename=save_directory + cropped_jpeg_list[pg_count])
+                #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+                #im_pil = Image.fromarray(im)
+                #im_pil.save(save_directory + cropped_jpeg_list[pg_count])
+                print("Cropped image saved.")
                 return im
 
-            # Average the angles to a degree offset
-            angle_deg = np.rad2deg(np.median(angles))
+            else:
+                # Average the angles to a degree offset
+                angle_deg = np.rad2deg(np.median(angles))
 
-            # Rotate the image by the residual offset
-            M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
-            im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+                # Rotate the image by the residual offset
+                M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
+                im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
 
-            # Plot if a full run
-            # Always save deskewed image
-            if args.type == "full":
-                plt.subplot(111),plt.imshow(im)
-                plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
-                plt.show()
-            cropped_jpeg = cropped_jpeg_list[pg_count]
-            cv2.imwrite(img = im,
-                        filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
-            return im
+                # Plot if a full run
+                # Always save deskewed image
+                if args.type == "full":
+                    plt.subplot(111),plt.imshow(im)
+                    plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+                    plt.show()
+                cropped_jpeg = cropped_jpeg_list[pg_count]
+                cv2.imwrite(img = im,
+                            filename = save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+                print("Only de-skewed cropped image saved.")
+                return im
         else:
             height, width = im.shape[:2]
             print(height)
@@ -97,23 +107,26 @@ def process_image(args):
                 print("Insufficient data to deskew. Cropped image might already be straight.")
                 return im
 
-            # Average the angles to a degree offset
-            angle_deg = np.rad2deg(np.median(angles))
+            else:
 
-            # Rotate the image by the residual offset
-            M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
-            im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+                # Average the angles to a degree offset
+                angle_deg = np.rad2deg(np.median(angles))
 
-            # Plot if a full run
-            # Always save deskewed image
-            if args.type == "full":
-                plt.subplot(111), plt.imshow(im)
-                plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
-                plt.show()
-            cropped_jpeg = cropped_jpeg_list[pg_count]
-            cv2.imwrite(img=im,
-                        filename=save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
-            return im
+                # Rotate the image by the residual offset
+                M = cv2.getRotationMatrix2D((width / 2, height / 2), angle_deg, 1)
+                im = cv2.warpAffine(im, M, (width, height), borderMode=cv2.BORDER_REPLICATE)
+
+                # Plot if a full run
+                # Always save deskewed image
+                if args.type == "full":
+                    plt.subplot(111), plt.imshow(im)
+                    plt.title('Deskewed Image'), plt.xticks([]), plt.yticks([])
+                    plt.show()
+                cropped_jpeg = cropped_jpeg_list[pg_count]
+                cv2.imwrite(img=im,
+                            filename=save_directory + cropped_jpeg[:-5] + "_rotated.jpeg")
+                print("Rotated cropped image saved")
+                return im
 
     def dilate(ary, N, iterations): 
         """Dilate using an NxN '+' sign shape. ary is np.uint8."""
@@ -388,42 +401,39 @@ def process_image(args):
             this_crop = c['x1'], c['y1'], c['x2'], c['y2']
             draw.rectangle(this_crop, outline='blue')
         draw.rectangle(crop, outline='red')
-        im.save(out_path + cropped_jpeg_list[pg_count])
+    #   im.save(out_path + cropped_jpeg_list[pg_count])
         draw.text((50, 50), path, fill='red')
-        orig_im.save(out_path + cropped_jpeg_list[pg_count])
+    #   orig_im.save(out_path + cropped_jpeg_list[pg_count])
         if args.type == "full":
             im.show()
         text_im = orig_im.crop(crop)
-        try:
-            print(type(text_im))
-        except:
-            print("")
+        # Converting to np array to calculate number of channels in jpg. Some directories are single channel jpgs
+        open_cv_image = np.array(text_im)
+        if open_cv_image.ndim == 2:
+            channels = 0
+        else:
+            channels = open_cv_image.shape[2]
+        print(channels)
+
+    #    try:
+            # print(type(text_im))
+    #    except:
+            # print("")
     #    text_im.save(out_path + cropped_jpeg_list[pg_count])
     #    print '%s -> %s' % (path, out_path)
 
         # Deskew image
-        # Unsure if deskew will accept the image from above so this is a quick fix until I know if it actually can
         direct_wo_saving = ""
         try:
-            try:
-                direct_wo_saving = "Y"
-                open_cv_image = np.array(text_im)
-                # Convert RGB to BGR
+            direct_wo_saving = "Y"
+            # Convert RGB to BGR
+            if channels != 0:
                 open_cv_image = open_cv_image[:, :, ::-1].copy()
-                deskewed_image = deskew(im=open_cv_image,
-                                        save_directory=out_path,
-                                        direct=direct_wo_saving)
-                pg_count += 1
-                print("Deskew complete. v 1.0")
-            except:
-                cropped_image = cv2.imread(text_im)
-                print("Cropped image read directly without saving to file")
-                direct_wo_saving = "Y"
-                deskewed_image = deskew(im=cropped_image,
-                                        save_directory=out_path,
-                                        direct=direct_wo_saving)
-                pg_count += 1
-                print("Deskew complete. v 2.0")
+            deskewed_image = deskew(im=open_cv_image,
+                                    save_directory=out_path,
+                                    direct=direct_wo_saving)
+            pg_count += 1
+            print("Pg " + str(pg_count) + " de-skew complete")
         except:
             direct_wo_saving = "N"
             text_im.save(out_path + cropped_jpeg_list[pg_count])

@@ -2,8 +2,9 @@
 This repository serves to consolidate all of the scripts required to operationalize the digitization process of New York City's 19th century directories.  
 
 #### Current Status @westerleyy
-As of January 7, 2020, a workflow for the preprocessing of the images has been developed. At this moment, it sits within the `WorkflowTrial01.ipynb` file. The present workflow will crop out images to just the columns and then perform an affine transformation which effectively deskews and rotates the image.  
-The `crop_for_columns.py` file operationalizes for bash command line operations.  
+As of January 30, 2020, a workflow for the preprocessing of the images has been developed with the `crop_for_columns.py` script. The present workflow will crop out images to just the columns and then perform an affine transformation which effectively deskews and rotates the image.
+
+Some directories were scanned in as single-channeled grayscale images. This will cause issues when converting from PIL images to OpenCV images directly as a batch under the assumption that all scanned images have three channels. The image pre-processing step has accounted for this when deskewing. 
   
 #### Tesseract -oem and -psm values  
 `-psm` stands for Page Segmentation Modes. This [page](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality#page-segmentation-method) explains in detail how it works but basically there are 14 options as listed below:  

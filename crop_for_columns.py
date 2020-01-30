@@ -422,6 +422,7 @@ def process_image(args):
             deskewed_image = deskew(im=cropped_image,
                                     save_directory=out_path,
                                     direct=direct_wo_saving)
+            pg_count += 1
 
 
 def main():

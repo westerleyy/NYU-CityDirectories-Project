@@ -27,21 +27,31 @@ def process_image(args):
             else:
                 im_gs = cv2.fastNlMeansDenoising(im, h=3)
 
+            # print("De-noise ok.")
             # Create an inverted B&W copy using Otsu (automatic) thresholding
             im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+            # print("Otsu ok.")
 
             # Detect lines in this image. Parameters here mostly arrived at by trial and error.
-            lines = cv2.HoughLinesP(
-                im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
-            )
-
-            # Collect the angles of these lines (in radians)
-            angles = []
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                geom = np.arctan2(y2 - y1, x2 - x1)
-                print(np.rad2deg(geom))
-                angles.append(geom)
+            # If the initial threshold is too high, then settle for a lower threshold value
+            try:
+                lines = cv2.HoughLinesP(im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150)
+                # Collect the angles of these lines (in radians)
+                angles = []
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    geom = np.arctan2(y2 - y1, x2 - x1)
+                    print(np.rad2deg(geom))
+                    angles.append(geom)
+            except:
+                lines = cv2.HoughLinesP(im_bw, 1, np.pi / 180, 150, minLineLength=width / 12, maxLineGap=width / 150)
+                # Collect the angles of these lines (in radians)
+                angles = []
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    geom = np.arctan2(y2 - y1, x2 - x1)
+                    print(np.rad2deg(geom))
+                    angles.append(geom)
 
             angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
 
@@ -88,17 +98,28 @@ def process_image(args):
             im_bw = cv2.threshold(im_gs, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
             # Detect lines in this image. Parameters here mostly arrived at by trial and error.
-            lines = cv2.HoughLinesP(
-                im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150
-            )
-
-            # Collect the angles of these lines (in radians)
-            angles = []
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                geom = np.arctan2(y2 - y1, x2 - x1)
-                print(np.rad2deg(geom))
-                angles.append(geom)
+            # If the initial threshold is too high, then settle for a lower threshold value
+            try:
+                lines = cv2.HoughLinesP(im_bw, 1, np.pi / 180, 200, minLineLength=width / 12, maxLineGap=width / 150)
+                # Collect the angles of these lines (in radians)
+                angles = []
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    geom = np.arctan2(y2 - y1, x2 - x1)
+                    print(np.rad2deg(geom))
+                    angles.append(geom)
+            except TypeError:
+                lines = cv2.HoughLinesP(im_bw, 1, np.pi / 180, 150, minLineLength=width / 12, maxLineGap=width / 150)
+                # Collect the angles of these lines (in radians)
+                angles = []
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    geom = np.arctan2(y2 - y1, x2 - x1)
+                    print(np.rad2deg(geom))
+                    angles.append(geom)
+            except:
+                print ("TypeError encountered with HoughLines. Check cropped image output. Only cropped image saved.")
+                return
 
             angles = [angle for angle in angles if abs(angle) < np.deg2rad(max_skew)]
 
@@ -407,6 +428,12 @@ def process_image(args):
         if args.type == "full":
             im.show()
         text_im = orig_im.crop(crop)
+        w_original, h_original = orig_im.size
+        w_original_half = w_original/2
+        w_cropped, h_cropped = text_im.size
+        if w_cropped < w_original_half:
+            text_im = orig_im
+            print ("More than half the page was cropped width-wise. Defaulting to original uncropped image.")
         # Converting to np array to calculate number of channels in jpg. Some directories are single channel jpgs
         open_cv_image = np.array(text_im)
         if open_cv_image.ndim == 2:

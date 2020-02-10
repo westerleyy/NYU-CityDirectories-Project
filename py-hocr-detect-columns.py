@@ -31,7 +31,15 @@ def build_manifest(main_path, entries_json):
     f.close()
 
 
+def make_tsv(filepath, type):
+    with open(filepath, 'w') as f:
+        f.write('\t'.join(['directory_uuid','page_uuid','entry_uuid', type + '_count', 'offset_count', 'token']))
+        f.write('\n')
+        f.close()
+
 def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
+    if not os.path.exists(os.path.join(dir_tsv, directory_uuid + '_subjects.tsv')):
+        make_tsv(os.path.join(dir_tsv, directory_uuid + '_subjects.tsv'), 'subject')
     with open(os.path.join(dir_tsv, directory_uuid + '_subjects.tsv'), 'a') as f:
         for rec in entries_json:
             subject_count = 0
@@ -47,6 +55,8 @@ def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
                     offset_count += 1
                 subject_count += 1
     f.close()
+    if not os.path.exists(os.path.join(dir_tsv, directory_uuid + '_occupations.tsv')):
+        make_tsv(os.path.join(dir_tsv, directory_uuid + '_occupations.tsv'), 'occupation')
     with open(os.path.join(dir_tsv, directory_uuid + '_occupations.tsv'), 'a') as f:
         for rec in entries_json:
             occupation_count = 0
@@ -62,6 +72,8 @@ def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
                     offset_count += 1
                 occupation_count += 1
     f.close()
+    if not os.path.exists(os.path.join(dir_tsv, directory_uuid + '_locations.tsv')):
+        make_tsv(os.path.join(dir_tsv, directory_uuid + '_locations.tsv'), 'location')
     with open(os.path.join(dir_tsv, directory_uuid + '_locations.tsv'), 'a') as f:
         for rec in entries_json:
             location_count = 0
@@ -246,7 +258,7 @@ def build_entries(args):
     directory_uuid = root.split('/')[-1]
     hocr_files = [file for file in os.listdir(args.path) if file.endswith('.hocr')]
 
-    for hocr_file in hocr_files[373:]:
+    for hocr_file in hocr_files:
         page_uuid = hocr_file.replace('_rotated','').replace('_cropped','').replace('.hocr','')
         try:
             raw_hocr_array, page_html = load_hocr_lines(os.path.join(args.path, hocr_file))

@@ -30,20 +30,69 @@ def build_manifest(main_path, entries_json):
         f.write('\n\n')
     f.close()
 
+
+def build_entries_tsv(entries_json, dir_tsv):
+    with open(os.path.join(dir_tsv, 'subjects.tsv'), 'a') as f:
+        for rec in entries_json:
+            subject_count = 0
+            for subject in entries_json[rec]['labeled_entry']['subjects']:
+                offset_count = 0
+                for sub_token in subject.split():
+                    f.write(entries_json[rec]['directory_uuid'] + '\t'
+                            + entries_json[rec]['page_uuid'] + '\t'
+                            + entries_json[rec]['entry_uuid'] + '\t')
+                    f.write(str(subject_count) + '\t')
+                    f.write(str(offset_count) + '\t')
+                    f.write(sub_token + '\n')
+                    offset_count += 1
+                subject_count += 1
+    f.close()
+    with open(os.path.join(dir_tsv, 'occupations.tsv'), 'a') as f:
+        for rec in entries_json:
+            occupation_count = 0
+            for occupation in entries_json[rec]['labeled_entry']['occupations']:
+                offset_count = 0
+                for occ_token in occupation.split():
+                    f.write(entries_json[rec]['directory_uuid'] + '\t'
+                            + entries_json[rec]['page_uuid'] + '\t'
+                            + entries_json[rec]['entry_uuid'] + '\t')
+                    f.write(str(occupation_count) + '\t')
+                    f.write(str(offset_count) + '\t')
+                    f.write(occ_token + '\n')
+                    offset_count += 1
+                occupation_count += 1
+    f.close()
+    with open(os.path.join(dir_tsv, 'locations.tsv'), 'a') as f:
+        for rec in entries_json:
+            location_count = 0
+            for location in entries_json[rec]['labeled_entry']['locations']:
+                offset_count = 0
+                for loc_token in location['value'].split():
+                    f.write(entries_json[rec]['directory_uuid'] + '\t'
+                            + entries_json[rec]['page_uuid'] + '\t'
+                            + entries_json[rec]['entry_uuid'] + '\t')
+                    f.write(str(location_count) + '\t')
+                    f.write(str(offset_count) + '\t')
+                    f.write(loc_token + '\n')
+                    offset_count += 1
+                location_count += 1
+    f.close()
+
+
 def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uuid, output_directory):
     print(image_filename)
     pageimg = Image.open(image_filename)
     overlay = ImageDraw.Draw(pageimg, 'RGBA')
 
-    color = {0:(255,0,0,90),1:(0,0,255,90),2:(0,255,0,90)}
-    ##Draw the hocr boxes
+    color = {0: (255, 0, 0, 90), 1: (0, 0, 255, 90), 2: (0, 255, 0, 90)}
+    # Draw the hocr boxes
     
     for i in range(len(r)):
         overlay.polygon([(r[i:i+1, 1], r[i:i+1, 4]),
-                      (r[i:i+1, 1], r[i:i+1, 2]),
-                     (r[i:i+1, 3], r[i:i+1, 2]),
-                     (r[i:i+1, 3], r[i:i+1, 4])],
-                     fill=color[int(r[i:i+1, 5])], outline=color[int(r[i:i+1, 5])])
+                       (r[i:i+1, 1], r[i:i+1, 2]),
+                       (r[i:i+1, 3], r[i:i+1, 2]),
+                       (r[i:i+1, 3], r[i:i+1, 4])],
+                       fill=color[int(r[i:i+1, 5])], outline=color[int(r[i:i+1, 5])])
 
     # Draw the column bounds
 
@@ -61,8 +110,6 @@ def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uui
     for gap_location in gap_locations:
         overlay.line([(0, gap_location), (pageimg.size[0], gap_location)],
                      fill=(0, 0, 0, 127), width=4)
-
-
     pageimg.save(os.path.join(output_directory, page_uuid + '.jpeg'), 'JPEG')
 
 
@@ -72,25 +119,25 @@ def json_from_hocr(line_array, page_html, page_uuid, directory_uuid):
     total_page_line_count = 0
     for line in page_html.html.body.div.find_all('span'):
         if line['class'][0] == 'ocr_line':
-            total_page_line_count+=1
+            total_page_line_count += 1
             id_num = int(line['id'].split('_')[2])
-            words = ' '.join([word.string.replace('\n','').strip() for word in line.children])
+            words = ' '.join([word.string.replace('\n', '').strip() for word in line.children])
             hocr_entries[id_num] = normalize_entry(words)
     entry_id = 0
     for keep_line in line_array:
         entry_uuid = uuid.uuid1()
         if keep_line[5] == 0:
             entries_json[entry_id] = {
-                'directory_uuid':directory_uuid,
-                'page_uuid':page_uuid,
-                'entry_uuid':entry_uuid.hex,
-                'total_lines_from_hocr':str(total_page_line_count),
-                'original_hocr_line_number':str(keep_line[0]),
-                'bbox':' '.join([str(val) for val in keep_line[1:5]]),
+                'directory_uuid': directory_uuid,
+                'page_uuid': page_uuid,
+                'entry_uuid': entry_uuid.hex,
+                'total_lines_from_hocr': str(total_page_line_count),
+                'original_hocr_line_number': str(keep_line[0]),
+                'bbox': ' '.join([str(val) for val in keep_line[1:5]]),
                 'col':str(keep_line[6]),
-                'appended':'no',
-                'skipped_line_after':str(keep_line[7]),
-                'complete_entry':hocr_entries[keep_line[0]]
+                'appended': 'no',
+                'skipped_line_after': str(keep_line[7]),
+                'complete_entry' :hocr_entries[keep_line[0]]
             }
             entry_id+=1
             
@@ -154,7 +201,7 @@ def load_hocr_lines(filepath):
 
 
 def normalize_entry(entry):
-    replacements = [("‘","'"),("’","'"),(" ay."," av."),(" ay,"," av,"),("- ","-"),(" -","-")]
+    replacements = [("‘","'"),("’","'"),(" ay."," av."),(" ay,"," av,"),("- ","-"),(" -","-"),("\t",' ')]
     for swap in replacements:
         entry = entry.replace(swap[0], swap[1])
     return ' '.join(entry.split())
@@ -197,12 +244,15 @@ def build_entries(args):
 
     root = '/'.join(args.path.split('/')[:-1])
     directory_uuid = root.split('/')[-1]
-    hocr_files = [file for file in os.listdir(args.path) if file.endswith('_cropped.hocr')]
+    hocr_files = [file for file in os.listdir(args.path) if file.endswith('.hocr')]
 
-    for hocr_file in hocr_files:
-        page_uuid = hocr_file.replace('_cropped.hocr','')
-        raw_hocr_array, page_html = load_hocr_lines(os.path.join(args.path, hocr_file))
-        jpeg_path = os.path.join(root, args.jpeg_directory, page_uuid + '_cropped.jpeg')
+    for hocr_file in hocr_files[373:]:
+        page_uuid = hocr_file.replace('_rotated','').replace('_cropped','').replace('.hocr','')
+        try:
+            raw_hocr_array, page_html = load_hocr_lines(os.path.join(args.path, hocr_file))
+        except:
+            print("Problem with hocr in ", page_uuid)
+        jpeg_path = os.path.join(root, args.jpeg_directory, hocr_file.replace('.hocr','.jpeg'))
 
         ##
         #   Find our likely column locations
@@ -239,9 +289,15 @@ def build_entries(args):
             col1_xval = mean([col1_xval_cands[0][0], col1_xval_cands[1][0]])
         else:
             col1_xval = col1_xval_cands[0][0]
-        if abs(col2_xval_cands[0][0] - col2_xval_cands[1][0]) < 50:
-            col2_xval = mean([col2_xval_cands[0][0], col2_xval_cands[1][0]])
-        else:
+        try:
+            if abs(col2_xval_cands[0][0] - col2_xval_cands[1][0]) < 50:
+                col2_xval = mean([col2_xval_cands[0][0], col2_xval_cands[1][0]])
+            else:
+                col2_xval = col2_xval_cands[0][0]
+
+        # For cases where we don't have multiple candidates for a second column,
+        # possibly because Tesseract missed second column entirely:
+        except:
             col2_xval = col2_xval_cands[0][0]
 
         ##
@@ -357,24 +413,23 @@ def build_entries(args):
                     for rec in sorted(entries_json.keys()):
                         f.write(json.dumps(entries_json[rec]) + '\n')
                 f.close()
+            if args.tsv_path != "False":
+                build_entries_tsv(entries_json, args.tsv_path)
+
 
 
 def main():
     parser=argparse.ArgumentParser(description="Parse hocr files and return entries")
     parser.add_argument("-in", help = "Directory containing hocr files", dest="path", type=str, required=True)
-    parser.add_argument("-build_image", help="Set whether to make images (True/False)", dest="make_image", default="False", type=str, required=True)
+    parser.add_argument("-build-image", help="Set whether to make images (True/False)", dest="make_image", default="False", type=str, required=True)
     parser.add_argument("-jpegs",help="Directory containing jpegs" ,dest="jpeg_directory", type=str, required=False)
-    parser.add_argument("-bbox_out", help="Directory to place output bbox images", dest="bbox_location", type=str, required=False)
+    parser.add_argument("-bbox-out", help="Directory to place output bbox images", dest="bbox_location", type=str, required=False)
     parser.add_argument("-mode", help="Either (P)rint out extracted entries, apply (CRF-print) and print out entries, or (CRF) and save JSON entries in labeled-json directory", dest="mode", type=str,required=True)
     parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=True)
+    parser.add_argument("-build-tsv", help="(False) or path to directory where tsv will be made", dest="tsv_path", type=str, required=True)
     parser.set_defaults(func=build_entries)
     args=parser.parse_args()
     args.func(args)
 
 if __name__=="__main__":
     main()
-    
-#path = '/Users/Nicholas/Desktop/TEMP-NYU-DIRECTORIES-PROJECT-OFFLINE/test-verification-files/1875.4b4b2b90-317a-0134-6800-00505686a51c/198.56789039.6c645950-5cec-0134-2c5e-00505686a51c_cropped.hocr'
-#path = '/Users/Nicholas/Desktop/TEMP-NYU-DIRECTORIES-PROJECT-OFFLINE/test-verification-files/1858.4afa0510-317a-0134-cf84-00505686a51c/198.56758282.97013df0-52b8-0134-192a-00505686a51c_cropped.hocr'
-#jpeg_path = '/Users/Nicholas/Desktop/TEMP-NYU-DIRECTORIES-PROJECT-OFFLINE/test-verification-files/1875.4b4b2b90-317a-0134-6800-00505686a51c/cropped-jpegs/198.56789039.6c645950-5cec-0134-2c5e-00505686a51c_cropped.jpeg'
-# jpeg_path = '/Users/Nicholas/Desktop/TEMP-NYU-DIRECTORIES-PROJECT-OFFLINE/test-verification-files/1858.4afa0510-317a-0134-cf84-00505686a51c/198.56758282.97013df0-52b8-0134-192a-00505686a51c_cropped.jpeg'

@@ -31,8 +31,8 @@ def build_manifest(main_path, entries_json):
     f.close()
 
 
-def build_entries_tsv(entries_json, dir_tsv):
-    with open(os.path.join(dir_tsv, 'subjects.tsv'), 'a') as f:
+def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
+    with open(os.path.join(dir_tsv, directory_uuid + '_subjects.tsv'), 'a') as f:
         for rec in entries_json:
             subject_count = 0
             for subject in entries_json[rec]['labeled_entry']['subjects']:
@@ -47,7 +47,7 @@ def build_entries_tsv(entries_json, dir_tsv):
                     offset_count += 1
                 subject_count += 1
     f.close()
-    with open(os.path.join(dir_tsv, 'occupations.tsv'), 'a') as f:
+    with open(os.path.join(dir_tsv, directory_uuid + '_occupations.tsv'), 'a') as f:
         for rec in entries_json:
             occupation_count = 0
             for occupation in entries_json[rec]['labeled_entry']['occupations']:
@@ -62,7 +62,7 @@ def build_entries_tsv(entries_json, dir_tsv):
                     offset_count += 1
                 occupation_count += 1
     f.close()
-    with open(os.path.join(dir_tsv, 'locations.tsv'), 'a') as f:
+    with open(os.path.join(dir_tsv, directory_uuid + '_locations.tsv'), 'a') as f:
         for rec in entries_json:
             location_count = 0
             for location in entries_json[rec]['labeled_entry']['locations']:
@@ -414,7 +414,7 @@ def build_entries(args):
                         f.write(json.dumps(entries_json[rec]) + '\n')
                 f.close()
             if args.tsv_path != "False":
-                build_entries_tsv(entries_json, args.tsv_path)
+                build_entries_tsv(entries_json, args.tsv_path, directory_uuid)
 
 
 

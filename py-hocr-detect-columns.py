@@ -32,7 +32,7 @@ def build_manifest(main_path, entries_json):
 
 
 def make_tsv(filepath, type):
-    with open(filepath, 'w') as f:
+    with open(filepath, 'w+') as f:
         f.write('\t'.join(['directory_uuid','page_uuid','entry_uuid', type + '_count', 'offset_count', 'token']))
         f.write('\n')
         f.close()
@@ -92,7 +92,6 @@ def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
 
 
 def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uuid, output_directory):
-    print(image_filename)
     pageimg = Image.open(image_filename)
     overlay = ImageDraw.Draw(pageimg, 'RGBA')
 
@@ -257,6 +256,8 @@ def build_entries(args):
     root = '/'.join(args.path.split('/')[:-1])
     directory_uuid = root.split('/')[-1]
     hocr_files = [file for file in os.listdir(args.path) if file.endswith('.hocr')]
+
+    print("Processing: ", directory_uuid)
 
     for hocr_file in hocr_files:
         page_uuid = hocr_file.replace('_rotated','').replace('_cropped','').replace('.hocr','')
@@ -427,6 +428,7 @@ def build_entries(args):
                 f.close()
             if args.tsv_path != "False":
                 build_entries_tsv(entries_json, args.tsv_path, directory_uuid)
+        print("Completed processing of ", directory_uuid)
 
 
 

@@ -18,8 +18,9 @@ def process_directories(args):
     for x in os.listdir():
         if os.path.isdir(x):
             for sub_dir in sub_dir_req:
-                sub_dir_path = x + "/" + sub_dir
-                os.makedirs(sub_dir_path)
+                sub_dir_path = os.path.join(x, sub_dir)
+                if not os.path.exists(sub_dir_path):
+                    os.makedirs(sub_dir_path)
 
 
 def main():

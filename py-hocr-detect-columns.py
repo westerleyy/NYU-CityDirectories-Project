@@ -93,12 +93,16 @@ def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
 
 
 def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uuid, output_directory):
-    pageimg = Image.open(image_filename)
+
+    # It would appear that the incoming cropped jpegs are grayscale, necessitating a conversion to RGB to move forward
+    # For the overlay, we use RGBA to enable opacity settings.
+
+    pageimg = Image.open(image_filename).convert('RGB')
     overlay = ImageDraw.Draw(pageimg, 'RGBA')
 
     color = {0: (255, 0, 0, 90), 1: (0, 0, 255, 90), 2: (0, 255, 0, 90)}
+
     # Draw the hocr boxes
-    
     for i in range(len(r)):
         overlay.polygon([(r[i:i+1, 1], r[i:i+1, 4]),
                        (r[i:i+1, 1], r[i:i+1, 2]),
@@ -275,7 +279,6 @@ def build_entries(args):
             centroids = kmeans.cluster_centers_
             cands_cols = {}
 
-
             for j in range(len(centroids)):
                 cands_cols[centroids[j,0]] = 0
                 std = sqrt(mean([((i - centroids[j,0])**2) for i in raw_hocr_array[:,1]]))
@@ -406,32 +409,33 @@ def build_entries(args):
 
             if args.make_image == 'True':
                 imagebuilder(sorted_line_only_array, [col1_xval, col2_xval], jpeg_path, std1, gap_locations, page_uuid, os.path.join(root, args.bbox_location))
-            # entries_json = json_from_hocr(sorted_line_only_array, page_html, page_uuid, directory_uuid)
-            # build_manifest(root, entries_json)
-            # if args.mode == 'P':
-            #     print(entries_json)
-            # else:
-            #     classifier = Classifier.Classifier()
-            #     classifier.load_training(args.crf_training_path)
-            #     classifier.train()
-            #     for rec in entries_json:
-            #         entry = LabeledEntry.LabeledEntry(entries_json[rec]['complete_entry'])
-            #         classifier.label(entry)
-            #         final_entries = normalize_labeled_entry(entry.categories)
-            #         entries_json[rec]['labeled_entry'] = final_entries
-            #         if args.mode == 'CRF-print':
-            #             print(entries_json[rec])
-            #     if args.mode == 'CRF':
-            #         with open(os.path.join(root, 'final-entries', page_uuid + '_labeled.json'), 'w') as f:
-            #             for rec in sorted(entries_json.keys()):
-            #                 f.write(json.dumps(entries_json[rec]) + '\n')
-            #         f.close()
-            #     if args.tsv_path != "False":
-            #         build_entries_tsv(entries_json, args.tsv_path, directory_uuid)
+            entries_json = json_from_hocr(sorted_line_only_array, page_html, page_uuid, directory_uuid)
+            build_manifest(root, entries_json)
+            if args.mode == 'P':
+                print(entries_json)
+            else:
+                classifier = Classifier.Classifier()
+                classifier.load_training(args.crf_training_path)
+                classifier.train()
+                for rec in entries_json:
+                    entry = LabeledEntry.LabeledEntry(entries_json[rec]['complete_entry'])
+                    classifier.label(entry)
+                    final_entries = normalize_labeled_entry(entry.categories)
+                    entries_json[rec]['labeled_entry'] = final_entries
+                    if args.mode == 'CRF-print':
+                        print(entries_json[rec])
+                if args.mode == 'CRF':
+                    with open(os.path.join(root, 'final-entries', page_uuid + '_labeled.json'), 'w') as f:
+                        for rec in sorted(entries_json.keys()):
+                            f.write(json.dumps(entries_json[rec]) + '\n')
+                    f.close()
+                if args.tsv_path != "False":
+                    build_entries_tsv(entries_json, args.tsv_path, directory_uuid)
             print("Completed processing of ", page_uuid)
 
-        except:
-            print("Likely ad or problematic hocr in :", page_uuid, ". Skipped.")
+        except Exception as exception:
+           print(type(exception).__name__)
+           print("Likely ad or problematic hocr in :", page_uuid, ". Skipped.")
 
 
 
@@ -442,8 +446,8 @@ def main():
     parser.add_argument("-jpegs",help="Name of directory (not path) containing jpegs" ,dest="jpeg_directory", type=str, required=False)
     parser.add_argument("-bbox-out", help="Full path to directory to place output bbox images", dest="bbox_location", type=str, required=False)
     parser.add_argument("-mode", help="Either (P)rint out extracted entries, apply (CRF-print) and print out entries, or (CRF) and save JSON entries in labeled-json directory", dest="mode", type=str,required=True)
-    parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=True)
-    parser.add_argument("-build-tsv", help="(False) or path to directory where tsv will be made", dest="tsv_path", type=str, required=True)
+    parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=False)
+    parser.add_argument("-build-tsv", help="(False) or path to directory where tsv will be made", dest="tsv_path", type=str, required=False)
     parser.set_defaults(func=build_entries)
     args=parser.parse_args()
     args.func(args)

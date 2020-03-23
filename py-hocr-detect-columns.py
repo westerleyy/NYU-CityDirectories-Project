@@ -10,6 +10,7 @@ import argparse
 import os
 import uuid
 from cdparser import Classifier, Features, LabeledEntry, Utils
+import sys
 
 
 def build_manifest(main_path, entries_json):
@@ -92,12 +93,16 @@ def build_entries_tsv(entries_json, dir_tsv, directory_uuid):
 
 
 def imagebuilder(r, col_locations, image_filename, std1, gap_locations, page_uuid, output_directory):
-    pageimg = Image.open(image_filename)
+
+    # It would appear that the incoming cropped jpegs are grayscale, necessitating a conversion to RGB to move forward
+    # For the overlay, we use RGBA to enable opacity settings.
+
+    pageimg = Image.open(image_filename).convert('RGB')
     overlay = ImageDraw.Draw(pageimg, 'RGBA')
 
     color = {0: (255, 0, 0, 90), 1: (0, 0, 255, 90), 2: (0, 255, 0, 90)}
+
     # Draw the hocr boxes
-    
     for i in range(len(r)):
         overlay.polygon([(r[i:i+1, 1], r[i:i+1, 4]),
                        (r[i:i+1, 1], r[i:i+1, 2]),
@@ -274,7 +279,6 @@ def build_entries(args):
             centroids = kmeans.cluster_centers_
             cands_cols = {}
 
-
             for j in range(len(centroids)):
                 cands_cols[centroids[j,0]] = 0
                 std = sqrt(mean([((i - centroids[j,0])**2) for i in raw_hocr_array[:,1]]))
@@ -427,21 +431,23 @@ def build_entries(args):
                     f.close()
                 if args.tsv_path != "False":
                     build_entries_tsv(entries_json, args.tsv_path, directory_uuid)
-            print("Completed processing of ", directory_uuid)
-        except:
-            print("Likely ad or problematic hocr in :", page_uuid, ". Skipped.")
+            print("Completed processing of ", page_uuid)
+
+        except Exception as exception:
+           print(type(exception).__name__)
+           print("Likely ad or problematic hocr in :", page_uuid, ". Skipped.")
 
 
 
 def main():
     parser=argparse.ArgumentParser(description="Parse hocr files and return entries")
-    parser.add_argument("-in", help = "Directory containing hocr files", dest="path", type=str, required=True)
+    parser.add_argument("-in", help = "Full-path directory containing hocr files", dest="path", type=str, required=True)
     parser.add_argument("-build-image", help="Set whether to make images (True/False)", dest="make_image", default="False", type=str, required=True)
-    parser.add_argument("-jpegs",help="Directory containing jpegs" ,dest="jpeg_directory", type=str, required=False)
-    parser.add_argument("-bbox-out", help="Directory to place output bbox images", dest="bbox_location", type=str, required=False)
+    parser.add_argument("-jpegs",help="Name of directory (not path) containing jpegs" ,dest="jpeg_directory", type=str, required=False)
+    parser.add_argument("-bbox-out", help="Full path to directory to place output bbox images", dest="bbox_location", type=str, required=False)
     parser.add_argument("-mode", help="Either (P)rint out extracted entries, apply (CRF-print) and print out entries, or (CRF) and save JSON entries in labeled-json directory", dest="mode", type=str,required=True)
-    parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=True)
-    parser.add_argument("-build-tsv", help="(False) or path to directory where tsv will be made", dest="tsv_path", type=str, required=True)
+    parser.add_argument("-path-training", help="Path to the training files for CRF classifer", dest="crf_training_path", type=str, required=False)
+    parser.add_argument("-build-tsv", help="(False) or path to directory where tsv will be made", dest="tsv_path", type=str, required=False)
     parser.set_defaults(func=build_entries)
     args=parser.parse_args()
     args.func(args)
